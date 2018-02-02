@@ -1,8 +1,11 @@
 runtime: python27
 api_version: 1
 threadsafe: true
-manual_scaling:
-  instances: 5
+service: headline
+
+libraries:
+- name: lxml
+  version: "3.7.3"
 
 handlers:
 - url: /.*
