@@ -1,12 +1,14 @@
 runtime: python27
 api_version: 1
 threadsafe: true
-service: headline
+service: crawler
 
 libraries:
 - name: lxml
   version: "3.7.3"
 
 handlers:
-- url: /.*
-  script: main.app
+- url: /
+  script: main_headline.app
+- url: /track
+  script: main_amazon.app

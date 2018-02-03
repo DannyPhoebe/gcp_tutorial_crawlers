@@ -1,0 +1,6 @@
+cron:
+- description: "cronjob for daily headline"
+  url: /
+  schedule: every 50 mins
+  target: crawler
+

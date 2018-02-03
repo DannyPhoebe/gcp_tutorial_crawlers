@@ -1,5 +1,6 @@
 import webapp2
 import cloudstorage as gcs
+import logging
 
 from bs4 import BeautifulSoup
 import requests
@@ -10,51 +11,45 @@ requests_toolbelt.adapters.appengine.monkeypatch()
 
 class Amazon_Tracker(webapp2.RequestHandler):
     def get(self):
-        for prod_url in read2gcs("prime-basis-152406.appspot.com/url2track.csv")
+        for line in gcs.open("/bucket/url2track.csv"):
+            prod_url, threshold = line.split(" ")
+            logging.info(prod_url)
             headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.84 Safari/537.36'}
-            res = requests.get(prod_url, headers=headers)
+            attempt = 0
+            while attempt < 5:
+                res = requests.get(prod_url, headers=headers)
+                if res.status_code == 200:
+                    break
             soup = BeautifulSoup(res.text, 'lxml')
-            price = soup.find('span',{'id':'priceblock_ourprice'})
-                     'priceblock_saleprice'
-            check_price = price.text if price is not None else soup.find('span',{'id':'priceblock_dealprice'}).text
-            price = float(check_price[2:].replace(',',''))
-        if price <= threshold:
-            lineNotify(, "price reached the threshold!")
-        self.response.headers['Content-Type'] = 'text/plain'
-        self.response.write(200)
+            price = soup.find('span',{'id': 'priceblock_ourprice'})
+            if price == None:
+                price = soup.find('span',{'id': 'priceblock_saleprice'})
+            if price == None:
+                price = soup.find('span',{'id': 'priceblock_dealprice'})
+            price = float(price.text[2:].replace(',', ''))
+            if price <= float(threshold) and self.request.get("notify") == 'yes':
+                self.lineNotify("your token", "price reached the threshold: {}".format(prod_url.encode('utf-8')))
+            self.response.headers['Content-Type'] = 'text/plain'
+            self.response.write("{}\n".format(price))
 
-    def post(self):
-        prod_url = self.request.get("prod_url")
-        threshold = self.request.get("threshold")
-        msg = prod_url + threshold + '\n'
-        write2gcs(filename)
-        self.response.write("Success")
-
-    def write2gcs(filenamem msg):
-        self.response.write('Creating file %s\n' % filename)
-        gcs_file = gcs.open(filename, 'w')
+    def write2gcs(self, msg):
+        gcs_file = gcs.open('/bucket/url2track.csv', 'a')
         gcs_file.write(msg + '\n')
         gcs_file.close()
+        self.response.write('Registered')
 
-        def lineNotify(token, msg):
-            url = "https://notify-api.line.me/api/notify"
-            headers = {
-                "Authorization": "Bearer " + token, 
-                "Content-Type" : "application/x-www-form-urlencoded"
-            }    
+    def lineNotify(self, token, msg):
+        url = "https://notify-api.line.me/api/notify"
+        headers = {
+            "Authorization": "Bearer " + token, 
+            "Content-Type" : "application/x-www-form-urlencoded"
+        }    
                 
-            payload = {'message': msg}
-            #payload = {'message': msg,"stickerPackageId": 2, 'stickerId': 38}
-            r = requests.post(url, headers = headers, params = payload)
-            return r.status_code
-
-    def read2gcs(filenamem):
-        gcs_file = gcs.open(filename)
-        wait2crawl = gcs_file.readlines()
-        gcs_file.close()
-        return w
+        payload = {'message': msg}
+        r = requests.post(url, headers=headers, params=payload)
+        return r.status_code
 
 
 app = webapp2.WSGIApplication([
-    ('/tracking', Amazon_Tracker),
+    ('/track', Amazon_Tracker),
 ], debug=True)
